@@ -2,12 +2,12 @@ import os
 import re
 import json
 import io
-import pprint
-from collections import OrderedDict
+
 
 with open('zone_files/inmz.net.zonefile.txt') as f:
     zone_file = f.readlines()
 
+# .tf file should be moved to dedicated tf dir
 inmz_zone_final = open('inmz.tf', 'w')
 
 # empty objects for output
