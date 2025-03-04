@@ -2,43 +2,51 @@ import os
 import json
 import re
 
+# Define file paths
+zone_file_path = '../zone_files/inmz.net.stripped.zonefile.txt'
+terraform_file_path = '../roles/route53/inmz.tf'
 
-with open('../zone_files/inmz.net.stripped.zonefile.txt') as f:
+# Read the zone file
+with open(zone_file_path) as f:
     zone_file = f.readlines()
 
-# .tf file should be moved to dedicated tf dir
-inmz_zone_final = open('../roles/route53/inmz.tf', 'w')
-
-# empty objects for output
-data = []
-json_object = {'resource': {'aws_route53_record': None}}
-terrarecord = {}
-
-# this is a constant throughout terraform file
+# Prepare the Terraform output structure
 zone_id = "${aws_route53_zone.inmz.zone_id}"
-url = '.inmz.net.'
+url_suffix = '.inmz.net.'
+terra_records = {}
 
-# remove whitespace and create data list
+# Process the zone file
 for line in zone_file:
-    stripped = re.sub(' +', ' ', line)
-    words = stripped.split(' ')
-    data.append(words)
+    stripped_line = re.sub(' +', ' ', line.strip())
+    words = stripped_line.split(' ')
+    
+    if len(words) >= 4:  # Ensure there are enough parts in the line
+        record_name = words[0].replace('.', '')
+        record_type = words[2]
+        record_ttl = words[1]
+        record_value = words[3].strip()  # Remove any trailing newline or spaces
 
-# create our terraform file here
-for each_list in data:
-    terrarecord[each_list[0].replace('.', '')] = {
-        "zone_id": zone_id,
-        "name": each_list[0] + url, # not sure if I need to do this
-        "type": each_list[2],
-        "ttl": each_list[1],
-        "records": [each_list[3].replace('\n', '')]
+        # Create a record entry
+        if record_name not in terra_records:
+            terra_records[record_name] = {
+                "zone_id": zone_id,
+                "name": record_name + url_suffix,
+                "type": record_type,
+                "ttl": record_ttl,
+                "records": []
+            }
+        
+        terra_records[record_name]["records"].append(record_value)
+
+# Prepare the final JSON object
+json_object = {
+    'resource': {
+        'aws_route53_record': terra_records
     }
+}
 
-json_object['resource']['aws_route53_record'] = terrarecord
+# Write the Terraform configuration to a file
+with open(terraform_file_path, 'w') as inmz_zone_final:
+    json.dump(json_object, inmz_zone_final, indent=4)
 
-# write to file
-for item in json_object:
-    inmz_zone_final.write('%s' % json.dumps(json_object))
-
-inmz_zone_final.close()
-f.close()
+print(f"Terraform configuration written to {terraform_file_path}")
